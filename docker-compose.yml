@@ -1,0 +1,57 @@
+version: '3.3'
+
+services:
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:80
+    external_links:
+      - db
+    environment:
+      - VIRTUAL_HOST=dev.celery-talk.com
+    volumes:
+      - .:/webapps
+    ports:
+      - "8000:80"
+    stdin_open: true
+    tty: true
+    networks:
+      shared:
+        aliases:
+         - dev.celery-talk.com
+
+  # Celery worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py celery worker -B -l info
+    external_links:
+      - db
+      - rabbit
+    environment:
+      - C_FORCE_ROOT=true
+    volumes:
+      - .:/webapps
+    networks:
+      - shared
+
+  flower:
+    build: .
+    command: python manage.py celery flower --broker_api=http://admin:123456@rabbit:15672/api/ --basic_auth=admin:123456 --broker=amqp://admin:123456@rabbit:5672// --port=5555
+    external_links:
+      - rabbit
+    environment:
+      DISCOVER_RABBITMQ: 'false'
+    ports:
+      - "5555:5555"
+    networks:
+      - shared
+
+networks:
+  shared:
+    external: true
+
+volumes:
+  docker_utils_services_pgdata:
+    external: true
